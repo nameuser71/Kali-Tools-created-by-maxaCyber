@@ -3,28 +3,70 @@
 #include <vector>
 #include <omp.h>
 #include <chrono>
+#include <cstring>
 
-// Kerakli belgilar jamlanmasi (Charsetni xohishga ko'ra o'zgartirishingiz mumkin)
 const std::string CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const int CHARSET_SIZE = CHARSET.size();
 
-// Berilgan uzunlikdagi jami kombinatsiyalar sonini hisoblash (masalan: CHARSET_SIZE^length)
+// Help menyusi uchun funksiya
+void print_help(const std::string& lang) {
+    if (lang == "uz") {
+        std::cout << "========================================================\n";
+        std::cout << "               Dasturdan foydalanish yo'riqnomasi        \n";
+        std::cout << "========================================================\n";
+        std::cout << "Buyruqlar:\n";
+        std::cout << "  ./full_brute              - Dasturni standart rejimda ishga tushirish\n";
+        std::cout << "  ./full_brute -h uz        - Yordam menyusini o'zbek tilida ko'rsatish\n";
+        std::cout << "  ./full_brute -h en        - Yordam menyusini ingliz tilida ko'rsatish\n";
+        std::cout << "  ./full_brute -h ru        - Yordam menyusini rus tilida ko'rsatish\n\n";
+        std::cout << "Tavsif:\n";
+        std::cout << "  Ushbu dastur OpenMP texnologiyasi yordamida barcha CPU yadrolaridan\n";
+        std::cout << "  foydalanib yuqori tezlikda incremental qidiruvni amalga oshiradi.\n";
+        std::cout << "========================================================\n";
+    } 
+    else if (lang == "ru") {
+        std::cout << "========================================================\n";
+        std::cout << "             Руководство по использованию                \n";
+        std::cout << "========================================================\n";
+        std::cout << "Команды:\n";
+        std::cout << "  ./full_brute              - Запуск программы в стандартном режиме\n";
+        std::cout << "  ./full_brute -h uz        - Показать справку на узбекском языке\n";
+        std::cout << "  ./full_brute -h en        - Показать справку на английском языке\n";
+        std::cout << "  ./full_brute -h ru        - Показать справку на русском языке\n\n";
+        std::cout << "Описание:\n";
+        std::cout << "  Программа использует OpenMP для параллельных вычислений на всех\n";
+        std::cout << "  ядрах процессора с максимальной производительностью.\n";
+        std::cout << "========================================================\n";
+    } 
+    else { // Standard: English
+        std::cout << "========================================================\n";
+        std::cout << "                   Usage Instructions                   \n";
+        std::cout << "========================================================\n";
+        std::cout << "Commands:\n";
+        std::cout << "  ./full_brute              - Run the program in default mode\n";
+        std::cout << "  ./full_brute -h uz        - Show help menu in Uzbek\n";
+        std::cout << "  ./full_brute -h en        - Show help menu in English\n";
+        std::cout << "  ./full_brute -h ru        - Show help menu in Russian\n\n";
+        std::cout << "Description:\n";
+        std::cout << "  High-performance incremental brute-force engine utilizing\n";
+        std::cout << "  OpenMP multi-threading across all available CPU cores.\n";
+        std::cout << "========================================================\n";
+    }
+}
+
 long long power(int base, int exp) {
     long long res = 1;
-    for (int i = 0; i < exp; ++i) {
-        res *= base;
-    }
+    for (int i = 0; i < exp; ++i) res *= base;
     return res;
 }
 
-// Bitta uzunlikdagi qismni parallel ravishda tekshirish
 bool crack_fixed_length(int length, const std::string& target, std::string& found_password) {
     long long total_combinations = power(CHARSET_SIZE, length);
     bool found = false;
 
     #pragma omp parallel for schedule(dynamic, 1000) shared(found, found_password)
     for (long long i = 0; i < total_combinations; ++i) {
-        if (found) continue; // Agar boshqa yadro topgan bo'lsa, to'xtash
+        if (found) continue;
 
         std::string candidate(length, ' ');
         long long temp = i;
@@ -33,8 +75,6 @@ bool crack_fixed_length(int length, const std::string& target, std::string& foun
             temp /= CHARSET_SIZE;
         }
 
-        // --- BU YERDA TEKSHIRUV AMALGA OSHIRILADI ---
-        // Agar aniq parol tekshirilsa:
         if (candidate == target) {
             #pragma omp critical
             {
@@ -42,23 +82,30 @@ bool crack_fixed_length(int length, const std::string& target, std::string& foun
                 found = true;
             }
         }
-        
-        /* 
-           Agar Hash tekshirilsa (masalan, SHA256 yoki MD5):
-           if (sha256(candidate) == target_hash) { ... }
-        */
     }
 
     return found;
 }
 
-int main() {
-    // Qidirilayotgan maqsad (Parol yoki Hash)
+int main(int argc, char* argv[]) {
+    // Buyruqlar satri argumentlarini tahlil qilish (-h uz, -h en, -h ru)
+    if (argc > 1) {
+        std::string arg1 = argv[1];
+        if (arg1 == "-h" || arg1 == "--help") {
+            std::string lang = "en"; // Standart til
+            if (argc > 2) {
+                lang = argv[2];
+            }
+            print_help(lang);
+            return 0;
+        }
+    }
+
     std::string target = "ab12"; 
     int min_length = 1;
-    int max_length = 6; // Eslatma: Uzunlik oshgani sayin kombinatsiyalar keskin ko'payadi!
+    int max_length = 6; 
 
-    std::cout << "[*] Yuqori unumdorlikdagi Incremental Brute-Force boshlandi...\n";
+    std::cout << "[*] Yuqori unumdorlikdagi Engine boshlandi...\n";
     std::cout << "[*] CPU yadrolari soni: " << omp_get_max_threads() << "\n";
     std::cout << "[*] Qidirilayotgan qiymat: " << target << "\n\n";
 
@@ -66,10 +113,8 @@ int main() {
     std::string found_password = "";
     bool success = false;
 
-    // Incremental qism: uzunlikni 1 dan boshlab bosqichma-bosqich oshirib boramiz
     for (int len = min_length; len <= max_length; ++len) {
         std::cout << "[*] Tekshirilmoqda: " << len << " xonali kombinatsiyalar...\n";
-        
         if (crack_fixed_length(len, target, found_password)) {
             success = true;
             break;
@@ -80,9 +125,9 @@ int main() {
     std::chrono::duration<double> elapsed = end_time - start_time;
 
     if (success) {
-        std::cout << "\n[+] MUVAFFAQIYAT! Parol topildi: " << found_password << "\n";
+        std::cout << "\n[+] MUVAFFAQIYAT! Natija: " << found_password << "\n";
     } else {
-        std::cout << "\n[-] Belgilangan uzunlik oralig'ida topilmadi.\n";
+        std::cout << "\n[-] Belgilangan oraliqda topilmadi.\n";
     }
     
     std::cout << "[*] Sarflangan vaqt: " << elapsed.count() << " soniya\n";
